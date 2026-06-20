@@ -1,0 +1,13 @@
+# Node
+node_modules/
+dist/
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Project Specific
+laptop_daemon/Phone_Downloads/
+laptop_daemon/Send_to_Phone/
