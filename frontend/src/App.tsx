@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { File as FileIcon, Download, RefreshCw, Zap, UploadCloud, Trash2, Shield } from 'lucide-react';
+import { File as FileIcon, Download, RefreshCw, Zap, UploadCloud, Trash2, Shield, Lock, KeyRound } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -13,7 +13,12 @@ interface FileItem {
 function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('omnidrop_auth') === 'true');
+  const [pin, setPin] = useState('');
+  const [authError, setAuthError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const CORRECT_PIN = import.meta.env.VITE_ACCESS_PIN || "1234";
 
   const fetchFiles = async () => {
     try {
@@ -39,10 +44,11 @@ function App() {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchFiles();
     const interval = setInterval(fetchFiles, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -97,6 +103,64 @@ function App() {
     }
     return fullName;
   };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === CORRECT_PIN) {
+      setIsAuthenticated(true);
+      localStorage.setItem('omnidrop_auth', 'true');
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+      setPin('');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#141414] text-[#E5E5E5] font-sans selection:bg-[#E50914]/40 relative overflow-hidden flex flex-col items-center justify-center">
+        {/* Subtle red cinematic glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#E50914] rounded-full opacity-10 blur-[150px] pointer-events-none z-0"></div>
+        
+        <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-sm px-6">
+          <div className="w-24 h-24 rounded-full bg-[#181818] border border-[#333] flex items-center justify-center shadow-2xl">
+            <Lock className="w-10 h-10 text-[#E50914]" />
+          </div>
+          
+          <div className="text-center">
+            <h1 className="text-3xl font-black tracking-wider uppercase text-white mb-2">Omni<span className="text-[#E50914]">Drop</span></h1>
+            <p className="text-[#808080] font-medium tracking-wide">Enter PIN to access secure network</p>
+          </div>
+
+          <form onSubmit={handlePinSubmit} className="w-full flex flex-col gap-4">
+            <div className="relative">
+              <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#808080]" />
+              <input
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="****"
+                className={`w-full bg-[#181818] border ${authError ? 'border-[#E50914] focus:border-[#E50914]' : 'border-[#333] focus:border-[#E50914]/50'} rounded-2xl py-4 pl-12 pr-4 text-center text-2xl tracking-[0.5em] text-white font-bold outline-none transition-all`}
+                autoFocus
+                maxLength={4}
+              />
+            </div>
+            
+            {authError && (
+              <p className="text-[#E50914] text-sm text-center font-medium animate-pulse">Incorrect PIN. Access Denied.</p>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full py-4 rounded-2xl bg-[#E50914] hover:bg-[#b80710] text-white font-bold tracking-widest uppercase transition-all shadow-lg shadow-[#E50914]/20 hover:shadow-[#E50914]/40"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#141414] text-[#E5E5E5] font-sans selection:bg-[#E50914]/40 relative overflow-x-hidden flex flex-col items-center">
