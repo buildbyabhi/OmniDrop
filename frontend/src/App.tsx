@@ -73,7 +73,7 @@ function App() {
     }
   };
 
-  const deleteFile = async (e: React.MouseEvent, filename: string) => {
+  const handleDelete = async (e: React.MouseEvent, filename: string) => {
     e.preventDefault();
     if (!window.confirm("Are you sure you want to delete this file?")) return;
     
