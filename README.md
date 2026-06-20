@@ -2,7 +2,7 @@
 
 **A Zero-Touch, Cinematic File Transfer System across all your devices.**
 
-🌐 **[Live Website / Demo](https://omnidrop-ruddy.vercel.app)**  
+🌐 **[Live Website / Demo](https://omnidrop-pro.vercel.app/)**  
 *(Note: If you changed your Vercel URL, update this link!)*
 
 OmniDrop is a modern, high-speed file synchronization tool designed to transfer files between your PC, mobile, and any other device effortlessly. It bridges the gap between different operating systems without requiring any cables, USBs, or account sign-ins on the client side.
