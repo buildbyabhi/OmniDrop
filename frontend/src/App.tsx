@@ -14,21 +14,20 @@ function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('omnidrop_auth') === 'true');
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(() => localStorage.getItem('omnidrop_pin') || '');
   const [authError, setAuthError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const CORRECT_PIN = import.meta.env.VITE_ACCESS_PIN || "1234";
-
   const fetchFiles = async () => {
+    if (!pin) return;
     try {
-      const { data, error } = await supabase.storage.from('sync_files').list();
+      const { data, error } = await supabase.storage.from('sync_files').list(pin);
       if (error) throw error;
       
       const validFiles = data?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
       
       const filesWithUrls = await Promise.all(validFiles.map(async (f) => {
-        const { data: urlData } = supabase.storage.from('sync_files').getPublicUrl(f.name);
+        const { data: urlData } = supabase.storage.from('sync_files').getPublicUrl(`${pin}/${f.name}`);
         return { 
           ...f, 
           url: urlData.publicUrl, 
@@ -57,7 +56,7 @@ function App() {
     setUploading(true);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      const uniqueName = `${Date.now()}_${safeName}`;
+      const uniqueName = `${pin}/${Date.now()}_${safeName}`;
       
       const { error } = await supabase.storage.from('sync_files').upload(uniqueName, file, {
         upsert: true
@@ -74,12 +73,12 @@ function App() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, filename: string) => {
+  const deleteFile = async (e: React.MouseEvent, filename: string) => {
     e.preventDefault();
     if (!window.confirm("Are you sure you want to delete this file?")) return;
     
     try {
-      const { error } = await supabase.storage.from('sync_files').remove([filename]);
+      const { error } = await supabase.storage.from('sync_files').remove([`${pin}/${filename}`]);
       if (error) throw error;
       await fetchFiles();
     } catch (err: any) {
@@ -106,13 +105,13 @@ function App() {
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === CORRECT_PIN) {
+    if (pin.length === 4) {
       setIsAuthenticated(true);
       localStorage.setItem('omnidrop_auth', 'true');
+      localStorage.setItem('omnidrop_pin', pin);
       setAuthError(false);
     } else {
       setAuthError(true);
-      setPin('');
     }
   };
 

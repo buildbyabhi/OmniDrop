@@ -12,6 +12,7 @@ load_dotenv()
 URL = os.environ.get("SUPABASE_URL", "")
 KEY = os.environ.get("SUPABASE_KEY", "")
 BUCKET_NAME = "sync_files"
+SYNC_PIN = os.environ.get("SYNC_PIN", "1234")
 
 supabase: Client = create_client(URL, KEY)
 
@@ -38,21 +39,25 @@ class SendFolderHandler(FileSystemEventHandler):
             try:
                 with open(filepath, 'rb') as f:
                     supabase.storage.from_(BUCKET_NAME).upload(
-                        path=filename,
+                        path=f"{SYNC_PIN}/{filename}",
                         file=f,
                         file_options={"content-type": "application/octet-stream"}
                     )
-                print(f"[PC -> Phone] Successfully uploaded {filename} to Supabase!")
+                print(f"[PC -> Phone] Successfully uploaded {filename} to Room {SYNC_PIN}!")
                 uploaded_files.add(filename)
             except Exception as e:
                 print(f"Error uploading {filename}: {e}")
 
 async def poll_downloads():
-    print(f"Listening for files from Phone... (Auto-Purge Enabled)")
+    print(f"Listening for files in Room {SYNC_PIN}... (Auto-Purge Enabled)")
     while True:
         try:
-            # List files in the bucket
-            res = supabase.storage.from_(BUCKET_NAME).list()
+            # List files in the bucket under SYNC_PIN folder
+            res = supabase.storage.from_(BUCKET_NAME).list(path=SYNC_PIN)
+            
+            # If folder doesn't exist or is empty, res might be empty or return an error depending on Supabase API
+            if not isinstance(res, list):
+                res = []
             
             for file_obj in res:
                 filename = file_obj['name']
@@ -70,7 +75,7 @@ async def poll_downloads():
                     # 1 Hour = 3600000 milliseconds
                     if current_time_ms - upload_time_ms > 3600000:
                         print(f"[Auto-Cleanup] Deleting expired file: {filename}")
-                        supabase.storage.from_(BUCKET_NAME).remove([filename])
+                        supabase.storage.from_(BUCKET_NAME).remove([f"{SYNC_PIN}/{filename}"])
                         continue
                 
                 print(f"[Phone -> PC] New file detected on cloud: {filename}")
@@ -83,7 +88,7 @@ async def poll_downloads():
                 has_dangerous_double_ext = any(ext in dangerous_exts for ext in parts)
                 
                 # Download first to memory buffer
-                data = supabase.storage.from_(BUCKET_NAME).download(filename)
+                data = supabase.storage.from_(BUCKET_NAME).download(f"{SYNC_PIN}/{filename}")
                 
                 # Magic Byte checking (Check if it's an executable disguised as an image)
                 is_executable_signature = data.startswith(b'MZ')
