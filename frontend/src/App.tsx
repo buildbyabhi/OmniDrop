@@ -49,7 +49,7 @@ function App() {
   const fetchNote = async () => {
     if (!pin) return;
     try {
-      const { data, error } = await supabase.storage.from('sync_files').download(`${pin}/clipboard.txt`);
+      const { data } = await supabase.storage.from('sync_files').download(`${pin}/clipboard.txt`);
       if (data) {
         const text = await data.text();
         setNote(text);
