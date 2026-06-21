@@ -116,6 +116,24 @@ def run_sync_loop():
     loop.run_until_complete(poll_downloads())
 
 # Pystray Menu Actions
+def on_send_clipboard(icon, item):
+    global last_clipboard_text
+    text = pyperclip.paste()
+    if text and text != last_clipboard_text:
+        last_clipboard_text = text
+        try:
+            supabase.storage.from_(BUCKET_NAME).remove([f"{SYNC_PIN}/clipboard.txt"])
+        except Exception:
+            pass
+        try:
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=f"{SYNC_PIN}/clipboard.txt",
+                file=text.encode('utf-8'),
+                file_options={"content-type": "text/plain"}
+            )
+        except Exception as e:
+            pass
+
 def on_open_send(icon, item):
     os.startfile(SEND_FOLDER)
 
@@ -135,6 +153,8 @@ def main():
     icon = pystray.Icon("OmniDrop")
     icon.menu = pystray.Menu(
         pystray.MenuItem(f"Room: {SYNC_PIN}", lambda: None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Send PC Clipboard to Phone", on_send_clipboard),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Open Send Folder", on_open_send),
         pystray.MenuItem("Open Downloads", on_open_downloads),
