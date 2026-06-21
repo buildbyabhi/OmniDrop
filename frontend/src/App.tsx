@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { File as FileIcon, Download, RefreshCw, Zap, UploadCloud, Trash2, Shield, Lock, KeyRound } from 'lucide-react';
+import { File as FileIcon, Download, RefreshCw, Zap, UploadCloud, Trash2, Shield, Lock, KeyRound, QrCode, X, Copy, Send } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -16,6 +17,9 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('omnidrop_auth') === 'true');
   const [pin, setPin] = useState(() => localStorage.getItem('omnidrop_pin') || '');
   const [authError, setAuthError] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [note, setNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = async () => {
@@ -24,7 +28,7 @@ function App() {
       const { data, error } = await supabase.storage.from('sync_files').list(pin);
       if (error) throw error;
       
-      const validFiles = data?.filter(f => f.name !== '.emptyFolderPlaceholder') || [];
+      const validFiles = data?.filter(f => f.name !== '.emptyFolderPlaceholder' && f.name !== 'clipboard.txt') || [];
       
       const filesWithUrls = await Promise.all(validFiles.map(async (f) => {
         const { data: urlData } = supabase.storage.from('sync_files').getPublicUrl(`${pin}/${f.name}`);
@@ -42,10 +46,39 @@ function App() {
     }
   };
 
+  const fetchNote = async () => {
+    if (!pin) return;
+    try {
+      const { data, error } = await supabase.storage.from('sync_files').download(`${pin}/clipboard.txt`);
+      if (data) {
+        const text = await data.text();
+        setNote(text);
+      }
+    } catch (e) {
+      // Ignore if file doesn't exist
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (roomParam && roomParam.length === 4) {
+      setPin(roomParam);
+      setIsAuthenticated(true);
+      localStorage.setItem('omnidrop_auth', 'true');
+      localStorage.setItem('omnidrop_pin', roomParam);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchFiles();
-    const interval = setInterval(fetchFiles, 3000);
+    fetchNote();
+    const interval = setInterval(() => {
+      fetchFiles();
+      fetchNote();
+    }, 3000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
@@ -85,6 +118,24 @@ function App() {
       console.error(err);
       alert(`Error deleting file: ${err.message}`);
     }
+  };
+
+  const handleSaveNote = async () => {
+    if (!note.trim()) return;
+    setSavingNote(true);
+    try {
+      const file = new File([note], 'clipboard.txt', { type: 'text/plain' });
+      await supabase.storage.from('sync_files').upload(`${pin}/clipboard.txt`, file, { upsert: true });
+    } catch (err) {
+      console.error("Error saving note", err);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleCopyNote = () => {
+    navigator.clipboard.writeText(note);
+    alert('Copied to clipboard!');
   };
 
   const formatBytes = (bytes: number = 0) => {
@@ -164,6 +215,17 @@ function App() {
   return (
     <div className="min-h-screen bg-[#141414] text-[#E5E5E5] font-sans selection:bg-[#E50914]/40 relative overflow-x-hidden flex flex-col items-center">
       
+      {/* Top Bar Actions */}
+      {isAuthenticated && (
+        <button 
+          onClick={() => setShowQR(true)} 
+          className="absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full bg-[#181818] border border-[#333] hover:bg-[#E50914] hover:border-[#E50914] hover:text-white text-[#808080] transition-all z-20 group"
+          title="Show QR Code"
+        >
+          <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        </button>
+      )}
+
       {/* Subtle red cinematic glow at the top */}
       <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#E50914] rounded-[100%] opacity-5 blur-[120px] pointer-events-none z-0"></div>
 
@@ -214,6 +276,37 @@ function App() {
                   <p className="text-[#808080] text-sm mt-2 font-medium">Send any file instantly to your devices</p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Magic Clipboard Section */}
+          <div className="w-full bg-[#181818] border border-[#333] rounded-2xl p-6 relative group">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+                <Copy className="w-5 h-5 text-[#808080]" /> Magic Clipboard
+              </h2>
+              {savingNote && <RefreshCw className="w-4 h-4 text-[#E50914] animate-spin" />}
+            </div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Paste text, URLs, or notes here to sync instantly..."
+              className="w-full bg-[#141414] border border-[#333] focus:border-[#E50914]/50 rounded-xl p-4 text-[#E5E5E5] font-medium resize-none min-h-[120px] outline-none transition-colors"
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button 
+                onClick={handleCopyNote}
+                className="px-4 py-2 rounded-xl bg-[#333] hover:bg-[#444] text-white font-medium tracking-wide transition-colors"
+              >
+                Copy
+              </button>
+              <button 
+                onClick={handleSaveNote}
+                disabled={savingNote || !note.trim()}
+                className="px-6 py-2 rounded-xl bg-[#E50914] hover:bg-[#b80710] disabled:opacity-50 text-white font-bold tracking-wide transition-colors flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" /> Send
+              </button>
             </div>
           </div>
 
@@ -296,6 +389,35 @@ function App() {
         </footer>
 
       </div>
+
+      {/* QR Code Modal */}
+      {showQR && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200" onClick={() => setShowQR(false)}>
+          <div className="bg-[#181818] p-8 rounded-3xl flex flex-col items-center gap-6 border border-[#333] shadow-2xl relative max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowQR(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-[#333] text-[#808080] hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-white uppercase tracking-widest">Room {pin}</h2>
+              <p className="text-[#808080] text-sm mt-1 font-medium">Scan to connect instantly</p>
+            </div>
+            <div className="bg-white p-4 rounded-2xl shadow-inner">
+              <QRCodeCanvas 
+                value={`https://omnidrop-pro.vercel.app/?room=${pin}`} 
+                size={220} 
+                level="H"
+                fgColor="#141414"
+              />
+            </div>
+            <div className="w-full pt-4 border-t border-[#333] flex justify-center">
+              <p className="text-xs text-[#E50914] font-bold tracking-widest uppercase flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Secure Connection
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
