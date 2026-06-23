@@ -154,6 +154,14 @@ function App() {
     return fullName;
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setPin('');
+    localStorage.removeItem('omnidrop_auth');
+    localStorage.removeItem('omnidrop_pin');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (pin.length === 4) {
@@ -217,13 +225,21 @@ function App() {
       
       {/* Top Bar Actions */}
       {isAuthenticated && (
-        <button 
-          onClick={() => setShowQR(true)} 
-          className="absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full bg-[#181818] border border-[#333] hover:bg-[#E50914] hover:border-[#E50914] hover:text-white text-[#808080] transition-all z-20 group"
-          title="Show QR Code"
-        >
-          <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform" />
-        </button>
+        <div className="absolute top-4 right-4 md:top-8 md:right-8 flex items-center gap-3 z-20">
+          <button 
+            onClick={handleLogout}
+            className="px-4 py-2 rounded-full bg-[#181818] border border-[#333] hover:bg-[#E50914] hover:border-[#E50914] text-[#808080] hover:text-white text-xs font-bold tracking-widest transition-all"
+          >
+            SWITCH ROOM
+          </button>
+          <button 
+            onClick={() => setShowQR(true)} 
+            className="p-3 rounded-full bg-[#181818] border border-[#333] hover:bg-[#E50914] hover:border-[#E50914] hover:text-white text-[#808080] transition-all group"
+            title="Show QR Code"
+          >
+            <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          </button>
+        </div>
       )}
 
       {/* Subtle red cinematic glow at the top */}
